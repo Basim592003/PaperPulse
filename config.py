@@ -6,6 +6,10 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 HF_API_KEY = os.getenv("HF_API_KEY")
+DAGSHUB_TOKEN = os.getenv("DAGSHUB_TOKEN")
+DAGSHUB_USER = os.getenv("DAGSHUB_USER")
+DAGSHUB_REPO = os.getenv("DAGSHUB_REPO")
+MLFLOW_EXPERIMENT = os.getenv("MLFLOW_EXPERIMENT", "paperpulse")
 
 DEV_MODEL = "llama-3.1-8b-instant"
 PROD_MODEL = "llama-3.3-70b-versatile"

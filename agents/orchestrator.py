@@ -10,6 +10,7 @@ from agents.extraction_agent import extraction_agent_run
 from agents.contradiction_agent import contradiction_agent_run
 from agents.synthesis_agent import synthesis_agent_run
 from agents.evaluator_agent import evaluator_agent_run
+from tracking.mlflow_logger import track_run
 
 MAX_ITERATIONS = 3
 
@@ -82,40 +83,42 @@ def orchestrator_run(query: str) -> dict:
     print(f"\n=== orchestrator.run query={query!r} threshold={EVAL_THRESHOLD} ===")
     state = _init_state(query)
 
-    # Initial full pipeline
-    _do_search(state)
-    _do_critique(state)
-    _do_extract(state)
-    _do_contradictions(state)
-    _do_synthesize(state)
-    evaluation = _do_evaluate(state)
-
-    while not evaluation["passed"] and state["iterations"] < MAX_ITERATIONS:
-        state["iterations"] += 1
-        action = evaluation.get("suggested_action", "re_synthesize")
-        state["history"].append({
-            "iteration": state["iterations"],
-            "overall": evaluation["overall"],
-            "weakest": evaluation.get("weakest_dimension"),
-            "action": action,
-        })
-        print(f"\n[orchestrator] iteration {state['iterations']}/{MAX_ITERATIONS} — "
-              f"overall={evaluation['overall']} action={action}")
-
-        if action == "fetch_more_papers":
-            _do_search(state)
-            _do_critique(state)
-            _do_extract(state)
-            _do_contradictions(state)
-            _do_synthesize(state)
-        elif action == "re_extract":
-            _do_extract(state)
-            _do_contradictions(state)
-            _do_synthesize(state)
-        else:
-            _do_synthesize(state)
-
+    with track_run(query) as logger:
+        _do_search(state)
+        _do_critique(state)
+        _do_extract(state)
+        _do_contradictions(state)
+        _do_synthesize(state)
         evaluation = _do_evaluate(state)
+
+        while not evaluation["passed"] and state["iterations"] < MAX_ITERATIONS:
+            state["iterations"] += 1
+            action = evaluation.get("suggested_action", "re_synthesize")
+            state["history"].append({
+                "iteration": state["iterations"],
+                "overall": evaluation["overall"],
+                "weakest": evaluation.get("weakest_dimension"),
+                "action": action,
+            })
+            print(f"\n[orchestrator] iteration {state['iterations']}/{MAX_ITERATIONS} — "
+                  f"overall={evaluation['overall']} action={action}")
+
+            if action == "fetch_more_papers":
+                _do_search(state)
+                _do_critique(state)
+                _do_extract(state)
+                _do_contradictions(state)
+                _do_synthesize(state)
+            elif action == "re_extract":
+                _do_extract(state)
+                _do_contradictions(state)
+                _do_synthesize(state)
+            else:
+                _do_synthesize(state)
+
+            evaluation = _do_evaluate(state)
+
+        logger.log_state(state)
 
     print(f"\n=== orchestrator.done passed={evaluation['passed']} "
           f"overall={evaluation['overall']} iterations={state['iterations']} ===")
