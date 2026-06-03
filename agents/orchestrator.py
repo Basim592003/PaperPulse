@@ -126,7 +126,7 @@ def orchestrator_run(query: str) -> dict:
 
 
 if __name__ == "__main__":
-    q = sys.argv[1] if len(sys.argv) > 1 else "hantavirus"
+    q = sys.argv[1] if len(sys.argv) > 1 else "deep learning for protein folding"
     final = orchestrator_run(q)
     print("\n=== FINAL DIGEST ===")
     print(json.dumps(final["digest"], indent=2))
