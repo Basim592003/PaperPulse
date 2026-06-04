@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -32,6 +33,39 @@ Paper text (may be truncated):
 
 # Groq context budget for the paper body. Abstract + prompt overhead is small.
 _MAX_TEXT_CHARS = 12000
+# How much of the budget to reserve for the tail (conclusion/results at the end).
+_TAIL_CHARS = 3000
+
+
+def _prepare_text(full_text: str) -> str:
+    """Strip front matter + references and keep the most informative content.
+
+    Naive [:N] truncation wastes budget on the title page (authors, emails,
+    affiliations) and can run out before reaching Results/Conclusion. We drop
+    the boilerplate head, cut the References tail, then keep the body head plus
+    the conclusion tail so the ending isn't lost.
+    """
+    text = full_text
+
+    # Drop everything before the Abstract/Introduction (title page boilerplate).
+    head_match = re.search(r"\b(abstract|introduction)\b", text, re.IGNORECASE)
+    if head_match and head_match.start() < 3000:
+        text = text[head_match.start():]
+
+    # Cut the References/Bibliography tail (last occurrence).
+    ref_matches = list(re.finditer(r"\n\s*(references|bibliography)\s*\n",
+                                   text, re.IGNORECASE))
+    if ref_matches:
+        text = text[:ref_matches[-1].start()]
+
+    text = text.strip()
+
+    if len(text) <= _MAX_TEXT_CHARS:
+        return text
+
+    # Keep the head plus the conclusion tail so we don't lose the ending.
+    head_budget = _MAX_TEXT_CHARS - _TAIL_CHARS
+    return text[:head_budget] + "\n...\n" + text[-_TAIL_CHARS:]
 
 
 def _empty_extraction(reason: str) -> dict:
@@ -48,7 +82,7 @@ def _extract_paper(paper: dict) -> dict:
     full_text = paper.get("full_text") or ""
     if not full_text:
         full_text = get_paper_full_text(paper["id"])
-    full_text = full_text[:_MAX_TEXT_CHARS]
+    full_text = _prepare_text(full_text)
     if not full_text:
         print(f"[_extract_paper] {paper.get('id')}: no full_text, skipping")
         return _empty_extraction("no full_text")

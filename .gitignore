@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 mlruns/
 CLAUDE.md
+Notes.txt

@@ -20,6 +20,8 @@ groq_client = Groq(api_key=GROQ_API_KEY)
 
 EXPAND_PROMPT = """You are a research assistant. Given a user's research question, generate 3 focused arXiv search queries that together cover the topic from different angles.
 
+IMPORTANT: Preserve the most specific and unusual terms from the user's query in at least one of the 3 queries. Do not drop domain-specific keywords.
+
 Use plain keywords only — no AND/OR operators, no quotes, no boolean syntax.
 Keep each query concise, 4-8 words max, using technical terminology.
 
