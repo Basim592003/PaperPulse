@@ -44,9 +44,9 @@ def _do_critique(state: dict) -> None:
     state["critiqued"] = result["shortlist"]
 
 
-def _do_extract(state: dict) -> None:
+def _do_extract(state: dict, force_refresh: bool = False, feedback: str = "") -> None:
     print(f"\n[orchestrator] -> extract")
-    result = extraction_agent_run(state["critiqued"])
+    result = extraction_agent_run(state["critiqued"], force_refresh=force_refresh, feedback=feedback)
     state["extractions"] = result["extractions"]
 
 
@@ -110,7 +110,8 @@ def orchestrator_run(query: str) -> dict:
                 _do_contradictions(state)
                 _do_synthesize(state)
             elif action == "re_extract":
-                _do_extract(state)
+                ca_feedback = (evaluation.get("feedback") or {}).get("citation_accuracy", "")
+                _do_extract(state, force_refresh=True, feedback=ca_feedback)
                 _do_contradictions(state)
                 _do_synthesize(state)
             else:
@@ -126,7 +127,7 @@ def orchestrator_run(query: str) -> dict:
 
 
 if __name__ == "__main__":
-    q = sys.argv[1] if len(sys.argv) > 1 else "agentic image inpainting"
+    q = sys.argv[1] if len(sys.argv) > 1 else "vLLMs for scientific literature review"
     final = orchestrator_run(q)
     print("\n=== FINAL DIGEST ===")
     print(json.dumps(final["digest"], indent=2))

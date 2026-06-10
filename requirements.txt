@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+groq
+supabase
+arxiv
+sentence-transformers
+pypdf
+mlflow
+python-dotenv

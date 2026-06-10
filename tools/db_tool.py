@@ -57,15 +57,18 @@ def extraction_exists(paper_id: str) -> bool:
     response = supabase.table("extractions").select("id").eq("paper_id", paper_id).execute()
     return len(response.data) > 0
 
-def save_extraction(paper_id: str, extraction: dict) -> None:
-    if not extraction_exists(paper_id):
-        supabase.table("extractions").insert({
-            "paper_id": paper_id,
-            "methodology": _clean(extraction.get("methodology", "")),
-            "key_claims": _clean(extraction.get("key_claims", [])),
-            "results": _clean(extraction.get("results", "")),
-            "limitations": _clean(extraction.get("limitations", [])),
-        }).execute()
+def save_extraction(paper_id: str, extraction: dict, overwrite: bool = False) -> None:
+    row = {
+        "methodology": _clean(extraction.get("methodology", "")),
+        "key_claims": _clean(extraction.get("key_claims", [])),
+        "results": _clean(extraction.get("results", "")),
+        "limitations": _clean(extraction.get("limitations", [])),
+    }
+    if extraction_exists(paper_id):
+        if overwrite:
+            supabase.table("extractions").update(row).eq("paper_id", paper_id).execute()
+        return
+    supabase.table("extractions").insert({"paper_id": paper_id, **row}).execute()
 
 def get_extraction(paper_id: str) -> dict | None:
     response = supabase.table("extractions").select("*").eq("paper_id", paper_id).execute()

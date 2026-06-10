@@ -27,24 +27,16 @@ Rules:
 
 Paper title: {title}
 Abstract: {abstract}
-
+{feedback_block}
 Paper text (may be truncated):
 {full_text}"""
 
-# Groq context budget for the paper body. Abstract + prompt overhead is small.
 _MAX_TEXT_CHARS = 12000
-# How much of the budget to reserve for the tail (conclusion/results at the end).
-_TAIL_CHARS = 3000
+_TAIL_CHARS = 4000
 
 
 def _prepare_text(full_text: str) -> str:
-    """Strip front matter + references and keep the most informative content.
 
-    Naive [:N] truncation wastes budget on the title page (authors, emails,
-    affiliations) and can run out before reaching Results/Conclusion. We drop
-    the boilerplate head, cut the References tail, then keep the body head plus
-    the conclusion tail so the ending isn't lost.
-    """
     text = full_text
 
     # Drop everything before the Abstract/Introduction (title page boilerplate).
@@ -78,7 +70,7 @@ def _empty_extraction(reason: str) -> dict:
     }
 
 
-def _extract_paper(paper: dict) -> dict:
+def _extract_paper(paper: dict, feedback: str = "") -> dict:
     full_text = paper.get("full_text") or ""
     if not full_text:
         full_text = get_paper_full_text(paper["id"])
@@ -87,9 +79,18 @@ def _extract_paper(paper: dict) -> dict:
         print(f"[_extract_paper] {paper.get('id')}: no full_text, skipping")
         return _empty_extraction("no full_text")
 
+    feedback_block = ""
+    if feedback:
+        feedback_block = (
+            "\nA previous extraction led to a digest with citation-accuracy problems. "
+            "Be especially careful to ground every claim in the text below and avoid "
+            f"the following issue:\n{feedback}\n"
+        )
+
     prompt = EXTRACTION_PROMPT.format(
         title=paper.get("title", ""),
         abstract=(paper.get("abstract") or "")[:2000],
+        feedback_block=feedback_block,
         full_text=full_text,
     )
     response = groq_client.chat.completions.create(
@@ -114,21 +115,23 @@ def _extract_paper(paper: dict) -> dict:
     }
 
 
-def extraction_agent_run(papers: list[dict]) -> dict:
-    print(f"\n[extraction.run] extracting from {len(papers)} papers")
+def extraction_agent_run(papers: list[dict], force_refresh: bool = False, feedback: str = "") -> dict:
+    print(f"\n[extraction.run] extracting from {len(papers)} papers"
+          f"{' (force_refresh)' if force_refresh else ''}")
     extractions = {}
     for p in papers:
         pid = p["id"]
-        cached = get_extraction(pid)
-        if cached:
-            print(f"[extraction.run]   {pid}: using cached extraction")
-            extractions[pid] = cached
-            continue
+        if not force_refresh:
+            cached = get_extraction(pid)
+            if cached:
+                print(f"[extraction.run]   {pid}: using cached extraction")
+                extractions[pid] = cached
+                continue
 
         print(f"[extraction.run]   {pid}: calling Groq")
-        ext = _extract_paper(p)
+        ext = _extract_paper(p, feedback=feedback)
         if "error" not in ext:
-            save_extraction(pid, ext)
+            save_extraction(pid, ext, overwrite=force_refresh)
             print(f"[extraction.run]   {pid}: saved "
                   f"({len(ext['key_claims'])} claims, {len(ext['limitations'])} limitations)")
         else:
