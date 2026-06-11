@@ -12,7 +12,7 @@ from agents.synthesis_agent import synthesis_agent_run
 from agents.evaluator_agent import evaluator_agent_run
 from tracking.mlflow_logger import track_run
 
-MAX_ITERATIONS = 3
+MAX_ITERATIONS = 2
 
 
 def _init_state(query: str) -> dict:

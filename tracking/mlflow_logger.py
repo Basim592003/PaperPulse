@@ -47,16 +47,21 @@ def track_run(query: str):
     Yields a `log` object with .log_state(state) which extracts metrics/params/artifacts.
     If tracking isn't configured, yields a no-op logger so callers don't need to branch.
     """
-    if not _init_tracking():
-        yield _NoOpLogger()
-        return
+    try:
 
-    with mlflow.start_run(run_name=query[:60]):
-        mlflow.log_param("query", query)
-        mlflow.log_param("eval_threshold", EVAL_THRESHOLD)
-        mlflow.log_param("dev_model", DEV_MODEL)
-        mlflow.log_param("prod_model", PROD_MODEL)
-        yield _Logger()
+        if not _init_tracking():
+            yield _NoOpLogger()
+            return
+
+        with mlflow.start_run(run_name=query[:60]):
+            mlflow.log_param("query", query)
+            mlflow.log_param("eval_threshold", EVAL_THRESHOLD)
+            mlflow.log_param("dev_model", DEV_MODEL)
+            mlflow.log_param("prod_model", PROD_MODEL)
+            yield _Logger()
+    except Exception as e:
+        print(f"[mlflow_logger] error initializing tracking: {e}")
+        yield _NoOpLogger()
 
 
 class _Logger:
