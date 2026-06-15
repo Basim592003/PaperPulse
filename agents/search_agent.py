@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import MAX_ARXIV_RESULTS
 from groq import Groq
@@ -17,6 +18,8 @@ from tools.pdf_tool import fetch_paper_text
 
 
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+PDF_FETCH_WORKERS = 8
 
 EXPAND_PROMPT = """You are a research assistant. Given a user's research question, generate 3 focused arXiv search queries that together cover the topic from different angles.
 
@@ -74,16 +77,32 @@ def ingest_from_arxiv(queries: list[str]) -> list[dict]:
     new_papers = []
     fetched = search_papers(queries)
     print(f"[ingest_from_arxiv] arXiv returned {len(fetched)} papers")
+
+    to_ingest = []
     for paper in fetched:
         if paper_exists(paper["id"]):
             print(f"[ingest_from_arxiv]   skip (already in db): {paper['id']}")
             continue
-        print(f"[ingest_from_arxiv]   ingesting: {paper['id']} — {paper['title'][:60]}")
-        try:
-            paper["full_text"] = fetch_paper_text(paper["pdf_url"])
-        except Exception as e:
-            print(f"[ingest_from_arxiv]   skip (pdf fetch failed: {e}): {paper['pdf_url']}")
-            continue
+        to_ingest.append(paper)
+
+    # PDF fetch is pure I/O — download/parse all candidates in parallel.
+    def _fetch(paper):
+        print(f"[ingest_from_arxiv]   fetching pdf: {paper['id']} — {paper['title'][:60]}")
+        paper["full_text"] = fetch_paper_text(paper["pdf_url"])
+        return paper
+
+    fetched_papers = []
+    with ThreadPoolExecutor(max_workers=PDF_FETCH_WORKERS) as executor:
+        futures = {executor.submit(_fetch, p): p for p in to_ingest}
+        for future in as_completed(futures):
+            paper = futures[future]
+            try:
+                fetched_papers.append(future.result())
+            except Exception as e:
+                print(f"[ingest_from_arxiv]   skip (pdf fetch failed: {e}): {paper['pdf_url']}")
+
+    # DB writes stay sequential.
+    for paper in fetched_papers:
         save_paper(paper)
         save_embedding(paper["id"], get_embedding(paper["abstract"]))
         new_papers.append(paper)
