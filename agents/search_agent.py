@@ -85,6 +85,7 @@ def ingest_from_arxiv(queries: list[str]) -> list[dict]:
             continue
         to_ingest.append(paper)
 
+
     # PDF fetch is pure I/O — download/parse all candidates in parallel.
     def _fetch(paper):
         print(f"[ingest_from_arxiv]   fetching pdf: {paper['id']} — {paper['title'][:60]}")
