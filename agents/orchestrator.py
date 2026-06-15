@@ -132,4 +132,4 @@ if __name__ == "__main__":
     print("\n=== FINAL DIGEST ===")
     print(json.dumps(final["digest"], indent=2))
     print("\n=== EVAL ===")
-    print(json.dumps(final["eval_score"], indent=3))
+    print(json.dumps(final["eval_score"], indent=2))
