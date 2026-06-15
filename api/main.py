@@ -4,6 +4,7 @@ import uuid
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from agents.orchestrator import orchestrator_run
@@ -11,6 +12,17 @@ from tools.embedding_tool import get_embedding
 from tools.db_tool import semantic_search, get_paper, get_extraction
 
 app = FastAPI(title="PaperPulse API")
+
+# Allow browser frontends to call this API. "*" permits any origin, which is
+# fine for local development. Before deploying publicly, replace allow_origins
+# with the specific frontend URL(s).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------------------------------------------------------------------------
