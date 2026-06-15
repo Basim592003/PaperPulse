@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import MAX_ARXIV_RESULTS
 
 
-client = arxiv.Client(page_size=10, delay_seconds=10, num_retries=5)
+client = arxiv.Client(page_size=10, delay_seconds=3, num_retries=5)
 
 def search_papers(queries: list[str]) -> list[dict]:
     papers = {}
@@ -33,5 +33,5 @@ def search_papers(queries: list[str]) -> list[dict]:
             print(f"[arxiv] HTTP {e.status} on query '{query}' — skipping")
             time.sleep(15)
             continue
-        time.sleep(10)
+        # time.sleep(5)
     return list(papers.values())

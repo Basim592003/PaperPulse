@@ -18,15 +18,15 @@ from tools.pdf_tool import fetch_paper_text
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-EXPAND_PROMPT = """You are a research assistant. Given a user's research question, generate 3 focused arXiv search queries that together cover the topic from different angles.
+EXPAND_PROMPT = """You are a research assistant. Given a user's research question, generate 2 focused arXiv search queries that together cover the topic from different angles.
 
-IMPORTANT: Preserve the most specific and unusual terms from the user's query in at least one of the 3 queries. Do not drop domain-specific keywords.
+IMPORTANT: Preserve the most specific and unusual terms from the user's query in at least one of the 2 queries. Do not drop domain-specific keywords.
 
 Use plain keywords only — no AND/OR operators, no quotes, no boolean syntax.
 Keep each query concise, 4-8 words max, using technical terminology.
 
-Return ONLY a JSON array of 3 strings, nothing else. Example:
-["denoising diffusion probabilistic models image synthesis", "score based generative models sampling", "DDPM latent diffusion image generation"]
+Return ONLY a JSON array of 2 strings, nothing else. Example:
+["denoising diffusion probabilistic models image synthesis", "score based generative models sampling"]
 
 User question: {query}"""
 

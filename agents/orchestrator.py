@@ -127,9 +127,9 @@ def orchestrator_run(query: str) -> dict:
 
 
 if __name__ == "__main__":
-    q = sys.argv[1] if len(sys.argv) > 1 else "vLLMs for scientific literature review"
+    q = sys.argv[1] if len(sys.argv) > 1 else "object detection real time"
     final = orchestrator_run(q)
     print("\n=== FINAL DIGEST ===")
     print(json.dumps(final["digest"], indent=2))
     print("\n=== EVAL ===")
-    print(json.dumps(final["eval_score"], indent=2))
+    print(json.dumps(final["eval_score"], indent=3))
