@@ -127,9 +127,19 @@ def orchestrator_run(query: str) -> dict:
 
 
 if __name__ == "__main__":
-    q = sys.argv[1] if len(sys.argv) > 1 else "object detection real time"
+    import time
+    start_time = time.time()
+    
+    q = sys.argv[1] if len(sys.argv) > 1 else "semantic segmentation scene understanding"
     final = orchestrator_run(q)
+    
+    elapsed = time.time() - start_time
+    minutes = int(elapsed // 60)
+    seconds = int(elapsed % 60)
+    
     print("\n=== FINAL DIGEST ===")
     print(json.dumps(final["digest"], indent=2))
     print("\n=== EVAL ===")
     print(json.dumps(final["eval_score"], indent=2))
+    print(f"\n=== TIME ===")
+    print(f"Total: {minutes}m {seconds}s")

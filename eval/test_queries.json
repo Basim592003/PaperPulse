@@ -15,6 +15,5 @@
     "efficient transformers long sequences",
     "generative adversarial networks image synthesis",
     "bert pretraining language understanding",
-    "semantic segmentation scene understanding",
-    "meta learning few shot classification"
+    "semantic segmentation scene understanding"
 ]
