@@ -53,6 +53,14 @@ def get_paper_full_text(paper_id: str) -> str:
         return response.data[0].get("full_text") or ""
     return ""
 
+def get_paper(paper_id: str) -> dict | None:
+    response = supabase.table("papers").select(
+        "id, title, abstract, authors, published_date"
+    ).eq("id", paper_id).execute()
+    if response.data:
+        return response.data[0]
+    return None
+
 def extraction_exists(paper_id: str) -> bool:
     response = supabase.table("extractions").select("id").eq("paper_id", paper_id).execute()
     return len(response.data) > 0

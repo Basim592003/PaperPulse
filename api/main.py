@@ -7,6 +7,8 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from agents.orchestrator import orchestrator_run
+from tools.embedding_tool import get_embedding
+from tools.db_tool import semantic_search, get_paper, get_extraction
 
 app = FastAPI(title="PaperPulse API")
 
@@ -91,3 +93,28 @@ def get_run(job_id: str):
     elif job["status"] == "failed":
         response["error"] = job["error"]
     return response
+
+
+@app.get("/papers/search")
+def search_papers(q: str, k: int = 10):
+    embedding = get_embedding(q)
+    results = semantic_search(embedding, match_count=k)
+    return {"query": q, "results": results}
+
+
+@app.get("/papers/{paper_id}")
+def read_paper(paper_id: str):
+    paper = get_paper(paper_id)
+    if paper is None:
+        raise HTTPException(status_code=404, detail="paper not found")
+    return paper
+
+
+@app.get("/papers/{paper_id}/extraction")
+def read_extraction(paper_id: str):
+    extraction = get_extraction(paper_id)
+    if extraction is None:
+        raise HTTPException(status_code=404, detail="extraction not found")
+    return extraction
+
+
