@@ -131,7 +131,7 @@ if __name__ == "__main__":
     import time
     start_time = time.time()
     
-    q = sys.argv[1] if len(sys.argv) > 1 else "meta learning few shot classification"
+    q = sys.argv[1] if len(sys.argv) > 1 else "efficient transformers long sequences"
     final = orchestrator_run(q)
     
     elapsed = time.time() - start_time

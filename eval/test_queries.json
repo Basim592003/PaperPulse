@@ -12,8 +12,6 @@
     "diffusion models text generation",
     "zero shot learning generalization",
     "multimodal learning vision language",
-    "efficient transformers long sequences",
-    "generative adversarial networks image synthesis",
-    "bert pretraining language understanding",
-    "semantic segmentation scene understanding"
+    "efficient transformers long sequences"
+
 ]
