@@ -33,5 +33,4 @@ def search_papers(queries: list[str]) -> list[dict]:
             print(f"[arxiv] HTTP {e.status} on query '{query}' — skipping")
             time.sleep(15)
             continue
-        # time.sleep(5)
     return list(papers.values())

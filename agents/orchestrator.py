@@ -11,6 +11,7 @@ from agents.contradiction_agent import contradiction_agent_run
 from agents.synthesis_agent import synthesis_agent_run
 from agents.evaluator_agent import evaluator_agent_run
 from tracking.mlflow_logger import track_run
+import time
 
 MAX_ITERATIONS = 2
 
@@ -130,7 +131,7 @@ if __name__ == "__main__":
     import time
     start_time = time.time()
     
-    q = sys.argv[1] if len(sys.argv) > 1 else "semantic segmentation scene understanding"
+    q = sys.argv[1] if len(sys.argv) > 1 else "efficient transformers long sequences"
     final = orchestrator_run(q)
     
     elapsed = time.time() - start_time

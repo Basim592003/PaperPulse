@@ -2,6 +2,7 @@ import sys
 import os
 import re
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from groq import Groq
@@ -9,6 +10,8 @@ from config import GROQ_API_KEY, DEV_MODEL
 from tools.db_tool import save_extraction, get_extraction, get_paper_full_text
 
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+EXTRACTION_WORKERS = 2
 
 EXTRACTION_PROMPT = """You are a research extraction agent. Read the paper text below and extract a structured summary.
 
@@ -119,6 +122,7 @@ def extraction_agent_run(papers: list[dict], force_refresh: bool = False, feedba
     print(f"\n[extraction.run] extracting from {len(papers)} papers"
           f"{' (force_refresh)' if force_refresh else ''}")
     extractions = {}
+    to_extract = []
     for p in papers:
         pid = p["id"]
         if not force_refresh:
@@ -127,9 +131,20 @@ def extraction_agent_run(papers: list[dict], force_refresh: bool = False, feedba
                 print(f"[extraction.run]   {pid}: using cached extraction")
                 extractions[pid] = cached
                 continue
+        to_extract.append(p)
 
-        print(f"[extraction.run]   {pid}: calling Groq")
-        ext = _extract_paper(p, feedback=feedback)
+    results = {}
+    with ThreadPoolExecutor(max_workers=EXTRACTION_WORKERS) as executor:
+        futures = {executor.submit(_extract_paper, p, feedback): p for p in to_extract}
+        for future in as_completed(futures):
+            pid = futures[future]["id"]
+            print(f"[extraction.run]   {pid}: called Groq")
+            try:
+                results[pid] = future.result()
+            except Exception as e:
+                results[pid] = _empty_extraction(f"groq call failed: {e}")
+
+    for pid, ext in results.items():
         if "error" not in ext:
             save_extraction(pid, ext, overwrite=force_refresh)
             print(f"[extraction.run]   {pid}: saved "
