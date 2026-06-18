@@ -2,6 +2,7 @@ import sys
 import os
 import re
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from datetime import datetime, timezone
 
 from supabase import create_client
 from config import SUPABASE_URL, SUPABASE_ANON_KEY
@@ -83,3 +84,34 @@ def get_extraction(paper_id: str) -> dict | None:
     if response.data:
         return response.data[0]
     return None
+
+def create_run(run_id: str, query: str) -> None:
+    supabase.table("runs").insert({
+        "id": run_id,
+        "query": _clean(query),
+        "status": "running",
+    }).execute()
+
+def set_run_result(run_id: str, result: dict) -> None:
+    supabase.table("runs").update({
+        "status": "done",
+        "result": _clean(result),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", run_id).execute()
+
+def set_run_failed(run_id: str, error: str) -> None:
+    supabase.table("runs").update({
+        "status": "failed",
+        "error": _clean(error),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", run_id).execute()
+
+def get_run(run_id: str) -> dict | None:
+    response = supabase.table("runs").select("*").eq("id", run_id).execute()
+    return response.data[0] if response.data else None
+
+def list_runs(limit: int = 20) -> list[dict]:
+    response = supabase.table("runs").select(
+        "id, query, status, created_at"
+    ).order("created_at", desc=True).limit(limit).execute()
+    return response.data

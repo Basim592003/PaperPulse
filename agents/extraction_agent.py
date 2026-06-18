@@ -42,12 +42,10 @@ def _prepare_text(full_text: str) -> str:
 
     text = full_text
 
-    # Drop everything before the Abstract/Introduction (title page boilerplate).
     head_match = re.search(r"\b(abstract|introduction)\b", text, re.IGNORECASE)
     if head_match and head_match.start() < 3000:
         text = text[head_match.start():]
 
-    # Cut the References/Bibliography tail (last occurrence).
     ref_matches = list(re.finditer(r"\n\s*(references|bibliography)\s*\n",
                                    text, re.IGNORECASE))
     if ref_matches:
@@ -58,7 +56,6 @@ def _prepare_text(full_text: str) -> str:
     if len(text) <= _MAX_TEXT_CHARS:
         return text
 
-    # Keep the head plus the conclusion tail so we don't lose the ending.
     head_budget = _MAX_TEXT_CHARS - _TAIL_CHARS
     return text[:head_budget] + "\n...\n" + text[-_TAIL_CHARS:]
 
