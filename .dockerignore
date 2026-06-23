@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+
+.env
+
+.git/
+.gitignore
+.vscode/
+
+mlruns/
+
+*.ipynb
+tester.py
+CLAUDE.md
+Notes.txt
