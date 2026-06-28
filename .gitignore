@@ -5,3 +5,4 @@ __pycache__/
 mlruns/
 CLAUDE.md
 Notes.txt
+.DS_Store

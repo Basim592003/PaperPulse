@@ -1,9 +1,10 @@
 fastapi
 uvicorn[standard]
+pydantic
+requests
 groq
 supabase
 arxiv
-sentence-transformers
 pypdf
 mlflow
 python-dotenv
