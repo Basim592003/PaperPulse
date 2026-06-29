@@ -28,21 +28,6 @@ query
 
 See `Notes.txt` for the full shared-state contract and each agent's exact I/O.
 
-## Project layout
-
-```
-agents/      # one *_agent_run() per stage, plus orchestrator.py
-tools/       # the only layer that touches the outside world
-  arxiv_tool.py      # search_papers(queries), rate-limited
-  pdf_tool.py        # fetch_paper_text(pdf_url)
-  embedding_tool.py  # get_embedding(text) — all-MiniLM-L6-v2, 384-dim
-  db_tool.py         # Supabase: papers, extractions, runs; match_papers RPC
-api/         # FastAPI service wrapping the orchestrator (main.py)
-tracking/    # mlflow_logger.py — track_run() context manager
-eval/        # test_queries.json benchmark + batch scoring
-config.py    # all tunables, loaded from .env
-```
-
 ## Setup
 
 Requires Python 3.12.
@@ -88,14 +73,6 @@ python eval/run_batch.py
 # Scratch script for exercising individual tools/agents
 python tester.py
 ```
-
-### Docker
-
-```bash
-docker compose up --build
-```
-
-The image pre-downloads the `all-MiniLM-L6-v2` embedding model at build time. The container reads secrets from `.env` and serves on port `8000`.
 
 ## API
 
