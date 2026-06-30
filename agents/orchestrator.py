@@ -154,6 +154,12 @@ def run_phase2(state: dict) -> dict:
     return state
 
 
+def orchestrator_run(query: str) -> dict:
+    """Autonomous end-to-end run (CLI / eval / tester). Composes both phases
+    with no human in the loop, preserving the original straight-through behavior."""
+    return run_phase2(run_phase1(query))
+
+
 if __name__ == "__main__":
     import time
     start_time = time.time()
