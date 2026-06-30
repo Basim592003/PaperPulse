@@ -80,13 +80,40 @@ def _do_evaluate(state: dict) -> dict:
     return result["evaluation"]
 
 
-def orchestrator_run(query: str) -> dict:
-    print(f"\n=== orchestrator.run query={query!r} threshold={EVAL_THRESHOLD} ===")
+def _ensure_phase2_keys(state: dict) -> None:
+    """Backfill keys that phase 2 fills, so a reloaded checkpoint can't KeyError."""
+    state.setdefault("papers", [])
+    state.setdefault("critiqued", [])
+    state.setdefault("extractions", {})
+    state.setdefault("contradictions", [])
+    state.setdefault("digest", None)
+    state.setdefault("eval_score", None)
+    state.setdefault("iterations", 0)
+    state.setdefault("history", [])
+
+
+def run_phase1(query: str) -> dict:
+    """Search + critique only. No MLflow wrapping: a checkpoint the human
+    abandons must not leave a dangling MLflow run open."""
+    print(f"\n=== orchestrator.phase1 query={query!r} ===")
     state = _init_state(query)
+    _do_search(state)
+    _do_critique(state)
+    return state
+
+
+def run_phase2(state: dict) -> dict:
+    """Extract -> contradictions -> synthesize -> evaluate (+ eval loop).
+
+    Takes a state that already has query/papers/critiqued populated (either
+    straight from phase 1, or reloaded from a checkpoint with a human-approved
+    `critiqued` subset). MLflow tracks this phase and logs the full state.
+    """
+    _ensure_phase2_keys(state)
+    query = state["query"]
+    print(f"\n=== orchestrator.phase2 query={query!r} threshold={EVAL_THRESHOLD} ===")
 
     with track_run(query) as logger:
-        _do_search(state)
-        _do_critique(state)
         _do_extract(state)
         _do_contradictions(state)
         _do_synthesize(state)
