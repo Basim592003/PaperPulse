@@ -7,11 +7,12 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from agents.orchestrator import orchestrator_run
+from agents.orchestrator import run_phase1, run_phase2
 from tools.embedding_tool import get_embedding
 from tools.db_tool import (
     semantic_search, get_paper, get_extraction,
     create_run, set_run_result, set_run_failed, get_run, list_runs,
+    set_run_awaiting, set_run_resuming,
 )
 
 app = FastAPI(title="PaperPulse API")
@@ -66,10 +67,57 @@ def _trim_state(state: dict) -> dict:
     }
 
 
+def _strip_heavy(paper: dict) -> dict:
+    """Drop full_text + embedding from a paper dict; both re-fetch from the DB
+    on demand, so the checkpoint blob stays small (a few KB, not megabytes)."""
+    return {k: v for k, v in paper.items() if k not in ("full_text", "embedding")}
+
+
+def _trim_partial_state(state: dict) -> dict:
+    """The phase-1 checkpoint persisted between critique and approval.
+
+    Keeps everything phase 2 needs to resume: query, the accumulated `papers`
+    (so the eval loop's fetch_more_papers branch can dedup against them), and
+    the full `critiqued` survivor list (with scores, for the human to review).
+    Heavy fields are stripped — extraction re-fetches full_text from the DB.
+    """
+    return {
+        "query": state["query"],
+        "papers": [_strip_heavy(p) for p in state.get("papers", [])],
+        "critiqued": [_strip_heavy(p) for p in state.get("critiqued", [])],
+        "iterations": 0,
+        "history": [],
+    }
+
+
+def _shortlist_preview(critiqued: list) -> list:
+    """What the client sees while a run awaits approval: enough to decide."""
+    return [
+        {
+            "id": p["id"],
+            "title": p.get("title", ""),
+            "abstract": p.get("abstract", ""),
+            "scores": p.get("scores", {}),
+        }
+        for p in critiqued
+    ]
+
+
 def _run_pipeline(job_id: str, query: str) -> None:
-    """Background worker: runs the (slow, blocking) orchestrator."""
+    """Background worker for phase 1: search + critique, then pause for the
+    human. The run sits in awaiting_shortlist_approval until POST .../approve."""
     try:
-        state = orchestrator_run(query)
+        state = run_phase1(query)
+        set_run_awaiting(job_id, _trim_partial_state(state))
+    except Exception as e:
+        _set_job_failed(job_id, str(e))
+
+
+def _resume_pipeline(job_id: str, partial_state: dict) -> None:
+    """Background worker for phase 2: extract -> ... -> evaluate on the
+    human-approved shortlist, then finalize the run."""
+    try:
+        state = run_phase2(partial_state)
         _set_job_result(job_id, _trim_state(state))
     except Exception as e:
         _set_job_failed(job_id, str(e))
