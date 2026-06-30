@@ -127,6 +127,10 @@ class RunRequest(BaseModel):
     query: str
 
 
+class ApproveRequest(BaseModel):
+    approved_ids: list[str]
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -153,9 +157,47 @@ def get_run_endpoint(job_id: str):
     response = {"job_id": job_id, "status": job["status"]}
     if job["status"] == "done" and job.get("result"):
         response.update(job["result"])
+    elif job["status"] == "awaiting_shortlist_approval" and job.get("partial_state"):
+        partial = job["partial_state"]
+        response["query"] = partial.get("query")
+        response["shortlist"] = _shortlist_preview(partial.get("critiqued", []))
     elif job["status"] == "failed":
         response["error"] = job.get("error")
     return response
+
+
+@app.post("/runs/{job_id}/approve")
+def approve_run(job_id: str, req: ApproveRequest, background_tasks: BackgroundTasks):
+    job = _get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    if job["status"] != "awaiting_shortlist_approval" or not job.get("partial_state"):
+        raise HTTPException(status_code=409, detail="run is not awaiting approval")
+
+    partial = job["partial_state"]
+    valid_ids = {p["id"] for p in partial.get("critiqued", [])}
+
+    unknown = [pid for pid in req.approved_ids if pid not in valid_ids]
+    if unknown:
+        raise HTTPException(
+            status_code=400, detail=f"unknown paper ids not in shortlist: {unknown}"
+        )
+
+    approved = set(req.approved_ids)
+    selected = [p for p in partial["critiqued"] if p["id"] in approved]
+    if not selected:
+        raise HTTPException(
+            status_code=400, detail="at least one paper must be approved"
+        )
+    partial["critiqued"] = selected
+
+    # Compare-and-swap awaiting -> running. If we lost the race (a concurrent
+    # approve already transitioned the run), reject this one.
+    if not set_run_resuming(job_id):
+        raise HTTPException(status_code=409, detail="run is not awaiting approval")
+
+    background_tasks.add_task(_resume_pipeline, job_id, partial)
+    return {"job_id": job_id, "status": "running"}
 
 
 @app.get("/papers/search")
