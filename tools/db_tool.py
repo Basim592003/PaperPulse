@@ -92,10 +92,33 @@ def create_run(run_id: str, query: str) -> None:
         "status": "running",
     }).execute()
 
+def set_run_awaiting(run_id: str, partial_state: dict) -> None:
+    """Pause a run after critique, storing the checkpoint for later resume."""
+    supabase.table("runs").update({
+        "status": "awaiting_shortlist_approval",
+        "partial_state": _clean(partial_state),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", run_id).execute()
+
+def set_run_resuming(run_id: str) -> bool:
+    """Transition awaiting_shortlist_approval -> running as a compare-and-swap.
+
+    Returns True if this call won the transition, False if the run was not in
+    the awaiting state (already resumed, done, failed, or unknown). The
+    extra .eq("status", ...) makes the update conditional, so a second
+    concurrent approve sees zero rows updated and can be rejected.
+    """
+    response = supabase.table("runs").update({
+        "status": "running",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", run_id).eq("status", "awaiting_shortlist_approval").execute()
+    return bool(response.data)
+
 def set_run_result(run_id: str, result: dict) -> None:
     supabase.table("runs").update({
         "status": "done",
         "result": _clean(result),
+        "partial_state": None,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", run_id).execute()
 
