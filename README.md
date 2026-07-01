@@ -28,6 +28,28 @@ query
 
 See `Notes.txt` for the full shared-state contract and each agent's exact I/O.
 
+## Human-in-the-loop (shortlist approval)
+
+Over the API, the pipeline runs in **two phases** with a human approval gate at the highest-leverage point — the critique shortlist. Everything downstream (extraction, contradictions, synthesis) inherits whatever the critique agent shortlisted, so a single wrong inclusion silently skews the whole digest. Pausing here lets a human drop off-topic papers in a few seconds before any expensive work runs.
+
+```
+POST /runs ─▶ Search ─▶ Critique ──▶ [ pause: awaiting_shortlist_approval ]
+                                              │  human reviews 5 papers,
+                                              │  approves a subset
+                                              ▼
+              POST /runs/{id}/approve ─▶ Extraction ─▶ Contradiction ─▶ Synthesis ─▶ Evaluator ─▶ done
+```
+
+1. **`POST /runs`** runs phase 1 (search + critique) in the background, then parks the run at status `awaiting_shortlist_approval` instead of continuing.
+2. **`GET /runs/{job_id}`** returns the shortlist for review — each paper's `id`, `title`, `abstract`, and critique `scores`.
+3. **`POST /runs/{job_id}/approve`** with `{"approved_ids": [...]}` filters the shortlist to the chosen subset and launches phase 2 (extraction → … → evaluator). The run flips back to `running`, then `done`.
+
+Notes:
+- You can only **keep or drop** from the shortlisted papers — `approved_ids` must be a non-empty subset of the ids returned in step 2 (an empty list or an unknown id returns `400`).
+- The gate is **only the first shortlist**. If the evaluator loops back with `fetch_more_papers`, the re-derived shortlist is used autonomously (no second pause).
+- Approving twice, or approving a run that isn't awaiting, returns `409` (a compare-and-swap guards the resume transition).
+- The **CLI path is unaffected**: `python agents/orchestrator.py "…"` (and the eval batch) run straight through with no human gate.
+
 ## Setup
 
 Requires Python 3.12.
@@ -56,7 +78,11 @@ DAGSHUB_REPO=...
 MLFLOW_EXPERIMENT=paperpulse
 ```
 
-The Supabase database needs a `papers` table (with an `embedding` column), an `extractions` table, a `runs` table for job history, and the pgvector `match_papers` RPC used for semantic search.
+The Supabase database needs a `papers` table (with an `embedding` column), an `extractions` table, a `runs` table for job history, and the pgvector `match_papers` RPC used for semantic search. The `runs` table also needs a `partial_state JSONB` column, which holds the phase-1 checkpoint while a run awaits shortlist approval:
+
+```sql
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS partial_state JSONB;
+```
 
 ## Running
 
@@ -81,9 +107,10 @@ Run with `uvicorn api.main:app --reload` from the repo root.
 | Method & path | Description |
 |---------------|-------------|
 | `GET /health` | Liveness check |
-| `POST /runs` | Submit a query; returns `job_id` immediately, pipeline runs in the background |
+| `POST /runs` | Submit a query; returns `job_id` immediately, runs search + critique in the background, then pauses for approval |
 | `GET /runs` | List run history |
-| `GET /runs/{job_id}` | Poll job status (`running` / `done` / `failed`); returns trimmed result when done |
+| `GET /runs/{job_id}` | Poll job status (`running` / `awaiting_shortlist_approval` / `done` / `failed`); returns the shortlist while awaiting, and the trimmed result when done |
+| `POST /runs/{job_id}/approve` | Approve a subset of the shortlist (`{"approved_ids": [...]}`) to resume the run through extraction → synthesis → evaluation |
 | `GET /papers/search?q=...&k=10` | Semantic search over cached papers via pgvector |
 | `GET /papers/{paper_id}` | Fetch one paper row |
 | `GET /papers/{paper_id}/extraction` | Fetch the stored extraction for a paper |
